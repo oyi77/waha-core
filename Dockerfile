@@ -254,9 +254,12 @@ ENV WAHA_ZIPPER=ZIPUNZIP
 
 # GOWS - use libc DNS resolver
 ENV GODEBUG=netdns=cgo
+RUN groupadd -r waha && useradd -r -g waha -d /app -s /usr/sbin/nologin waha \
+    && mkdir -p /app/data /app/logs \
+    && chown -R waha:waha /app
 
-# Run command, etc
+USER waha
+
 EXPOSE 3000
-# Use tini as init system to handle zombie processes properly
 ENTRYPOINT ["/usr/bin/tini", "--"]
 CMD ["/entrypoint.sh"]
