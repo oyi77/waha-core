@@ -14,6 +14,30 @@ export class InboxContactInfo implements ContactInfo {
     return INBOX_CONTACT_CHAT_ID;
   }
 
+  SetFetchedContact(): void {
+    return;
+  }
+
+  async LidId(): Promise<string | null> {
+    return null;
+  }
+
+  async JidId(): Promise<string | null> {
+    return null;
+  }
+
+  async PhoneNumberE164(): Promise<string | null> {
+    return null;
+  }
+
+  async SavedName(): Promise<string | null> {
+    return null;
+  }
+
+  async PushName(): Promise<string | null> {
+    return null;
+  }
+
   async AvatarUrl() {
     return this.l.key(TKey.APP_INBOX_CONTACT_AVATAR_URL).render();
   }

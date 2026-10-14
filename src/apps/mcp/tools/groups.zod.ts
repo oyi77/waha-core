@@ -7,6 +7,8 @@ import {
   GroupsPaginationParams,
   JoinGroupRequest,
   ParticipantsRequest,
+  SettingsMembershipApproval,
+  SettingsMemberShareHistoryMode,
   SettingsSecurityChangeInfo,
   SubjectRequest,
 } from '@waha/structures/groups.dto';
@@ -61,6 +63,20 @@ export const GroupAdminOnlyInput = DtoToZod(SettingsSecurityChangeInfo).extend({
 });
 
 export const GroupParticipantsInput = DtoToZod(ParticipantsRequest).extend({
+  session: SessionField,
+  id: GroupIdField,
+});
+
+export const GroupMembershipApprovalInput = DtoToZod(
+  SettingsMembershipApproval,
+).extend({
+  session: SessionField,
+  id: GroupIdField,
+});
+
+export const GroupMemberShareHistoryInput = DtoToZod(
+  SettingsMemberShareHistoryMode,
+).extend({
   session: SessionField,
   id: GroupIdField,
 });

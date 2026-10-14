@@ -8,6 +8,8 @@ import {
   GroupDescriptionInput,
   GroupIdInput,
   GroupJoinInput,
+  GroupMembershipApprovalInput,
+  GroupMemberShareHistoryInput,
   GroupParticipantsInput,
   GroupPictureInput,
   GroupsListInput,
@@ -359,6 +361,149 @@ export class GroupTools extends McpController {
     return this.textRequest({
       method: 'PUT',
       url: `/api/${session}/groups/${id}/settings/security/messages-admin-only`,
+      data: body,
+    });
+  }
+
+  @Tool('groups-get-membership-approval', {
+    title: 'Get membership approval setting',
+    description:
+      'Get whether admin approval is required for users requesting to join the group',
+    inputSchema: GroupIdInput,
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+    },
+  })
+  async getMembershipApproval({ session, id }: z.infer<typeof GroupIdInput>) {
+    return this.textRequest({
+      method: 'GET',
+      url: `/api/${session}/groups/${id}/settings/security/membership-approval`,
+    });
+  }
+
+  @Tool('groups-set-membership-approval', {
+    title: 'Set membership approval setting',
+    description:
+      'Enable or disable admin approval for users requesting to join the group',
+    inputSchema: GroupMembershipApprovalInput,
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+    },
+  })
+  async setMembershipApproval({
+    session,
+    id,
+    ...body
+  }: z.infer<typeof GroupMembershipApprovalInput>) {
+    return this.textRequest({
+      method: 'PUT',
+      url: `/api/${session}/groups/${id}/settings/security/membership-approval`,
+      data: body,
+    });
+  }
+
+  @Tool('groups-get-member-share-history', {
+    title: 'Get member share history setting',
+    description:
+      'Get whether all members or only admins can share message history with new members',
+    inputSchema: GroupIdInput,
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+    },
+  })
+  async getMemberShareHistory({ session, id }: z.infer<typeof GroupIdInput>) {
+    return this.textRequest({
+      method: 'GET',
+      url: `/api/${session}/groups/${id}/settings/security/member-share-history-mode`,
+    });
+  }
+
+  @Tool('groups-set-member-share-history', {
+    title: 'Set member share history setting',
+    description:
+      'Allow all members or only admins to share message history with new members',
+    inputSchema: GroupMemberShareHistoryInput,
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+    },
+  })
+  async setMemberShareHistory({
+    session,
+    id,
+    ...body
+  }: z.infer<typeof GroupMemberShareHistoryInput>) {
+    return this.textRequest({
+      method: 'PUT',
+      url: `/api/${session}/groups/${id}/settings/security/member-share-history-mode`,
+      data: body,
+    });
+  }
+
+  @Tool('groups-get-join-requests', {
+    title: 'Get pending requests to join the group',
+    description: 'Get pending requests to join the group',
+    inputSchema: GroupIdInput,
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+    },
+  })
+  async getJoinRequests({ session, id }: z.infer<typeof GroupIdInput>) {
+    return this.textRequest({
+      method: 'GET',
+      url: `/api/${session}/groups/${id}/participants/join-requests`,
+    });
+  }
+
+  @Tool('groups-approve-join-requests', {
+    title: 'Approve pending requests to join the group',
+    description: 'Approve pending requests to join the group',
+    inputSchema: GroupParticipantsInput,
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+    },
+  })
+  async approveJoinRequests({
+    session,
+    id,
+    ...body
+  }: z.infer<typeof GroupParticipantsInput>) {
+    return this.textRequest({
+      method: 'POST',
+      url: `/api/${session}/groups/${id}/participants/join-requests/approve`,
+      data: body,
+    });
+  }
+
+  @Tool('groups-reject-join-requests', {
+    title: 'Reject pending requests to join the group',
+    description: 'Reject pending requests to join the group',
+    inputSchema: GroupParticipantsInput,
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+    },
+  })
+  async rejectJoinRequests({
+    session,
+    id,
+    ...body
+  }: z.infer<typeof GroupParticipantsInput>) {
+    return this.textRequest({
+      method: 'POST',
+      url: `/api/${session}/groups/${id}/participants/join-requests/reject`,
       data: body,
     });
   }

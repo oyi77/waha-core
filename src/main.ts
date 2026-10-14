@@ -1,3 +1,4 @@
+import { injectTraceContext } from './tracing'; // MUST be line 1, before @nestjs/* and before pino
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -16,7 +17,7 @@ if (fs.existsSync(_configOverridePath)) {
 
 import { NestFactory } from '@nestjs/core';
 import { WsAdapter } from '@nestjs/platform-ws';
-import { WAHA_WEBHOOKS } from '@waha/structures/webhooks';
+import { AppBootstrapService } from '@waha/plugins/AppBootstrapService';
 import {
   getNestJSLogLevels,
   getPinoLogLevel,
@@ -31,13 +32,13 @@ import pino from 'pino';
 import { WhatsappConfigService } from './config.service';
 import { AppModuleCore } from './core/app.module.core';
 import { CallAudioGateway } from './api/calls.audio.gateway';
-import { SwaggerConfiguratorCore } from './core/SwaggerConfiguratorCore';
 import { AllExceptionsFilter } from './nestjs/AllExceptionsFilter';
 import { getWAHAVersion, VERSION, WAHAVersion } from './version';
 import { loadESMModules } from '@waha/vendor/esm';
-import { setGlobalDispatcher, Agent } from 'undici';
+import { setGlobalDispatcher, EnvHttpProxyAgent } from 'undici';
 
-setGlobalDispatcher(new Agent({ connect: { family: 4 } }));
+// honor HTTP(S)_PROXY / NO_PROXY for global fetch (media downloads); direct connection otherwise
+setGlobalDispatcher(new EnvHttpProxyAgent({ connect: { family: 4 } }));
 
 const logger: Logger = pino({
   level: getPinoLogLevel(),
@@ -45,17 +46,17 @@ const logger: Logger = pino({
 }).child({ name: 'Bootstrap' });
 
 process.on('uncaughtException', (err) => {
-  logger.error('Uncaught Exception:', err);
+  logger.error(err, 'Uncaught Exception');
   if (err instanceof Error) {
     logger.error(err.stack);
   }
 });
 process.on('unhandledRejection', (reason, promise) => {
-  logger.error('Unhandled Rejection at:', promise);
+  logger.error({ promise: promise }, 'Unhandled Rejection at');
   if (reason instanceof Error) {
     logger.error(reason.stack);
   } else {
-    logger.error('Unhandled rejection reason:', reason);
+    logger.error(reason, 'Unhandled rejection reason');
   }
 });
 logger.info('NODE - Catching unhandled rejections and exceptions enabled');
@@ -101,7 +102,8 @@ async function bootstrap() {
   app.useGlobalInterceptors(new LoggerErrorInterceptor());
 
   app.useGlobalFilters(new AllExceptionsFilter());
-  app.enableCors();
+  app.enableCors({ exposedHeaders: ['traceparent', 'tracestate'] });
+  app.use(injectTraceContext);
   // Ideally, we should apply it globally.
   // but for now we added it ValidationPipe on Controller or endpoint level
   // app.useGlobalPipes(new ValidationPipe({ transform: true }));
@@ -119,9 +121,9 @@ async function bootstrap() {
     }
   });
 
-  // Configure swagger
-  const swaggerConfigurator = new SwaggerConfiguratorCore(app);
-  swaggerConfigurator.configure(WAHA_WEBHOOKS);
+  // Run app configuration hooks contributed by modules (e.g. swagger)
+  const appBootstrap = app.get(AppBootstrapService);
+  appBootstrap.run(app);
 
   AppModule.appReady(app, logger);
   app.enableShutdownHooks();

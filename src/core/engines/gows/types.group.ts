@@ -89,6 +89,7 @@ export interface GOWSGroupParticipant {
   PhoneNumber: JID;
   IsAdmin: boolean;
   IsSuperAdmin: boolean;
+  Error?: number; // set when the participant action failed
 }
 
 export interface GroupInfoFull {
@@ -100,10 +101,32 @@ export interface GroupInfoFull {
   IsAnnounce: boolean; // specifies whether only admins can send messages in the group
   Participants: GOWSGroupParticipant[];
   MemberAddMode: string; // all_member_add | admin_add
+  MemberShareHistoryMode: string; // all_member_share | admin_share
   IsJoinApprovalRequired: boolean;
 }
 
 export interface JoinedGroupEvent extends GroupInfoFull {
   Reason: string;
   Type: string;
+}
+
+export interface GOWSGroupJoinRequest {
+  JID: JID;
+  PhoneNumber: JID; // empty string if not provided
+  RequestMethod: string; // invite_link | linked_group_join | non_admin_add
+}
+
+export interface GroupJoinRequestEvent {
+  JID: JID;
+  Sender?: JID;
+  SenderPN?: JID;
+  Timestamp: string;
+  Action: string; // created | revoked
+  Requests: GOWSGroupJoinRequest[];
+}
+
+// GetGroupRequestParticipants RPC result item
+export interface GOWSGroupParticipantRequest {
+  JID: JID;
+  RequestedAt: string;
 }

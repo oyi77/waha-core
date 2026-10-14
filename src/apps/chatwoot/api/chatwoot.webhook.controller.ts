@@ -5,7 +5,7 @@ import {
   Param,
   Post,
 } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiOperation } from '@nestjs/swagger';
 import { IsCommandsChat } from '@waha/apps/chatwoot/client/ids';
 import { EventName, MessageType } from '@waha/apps/chatwoot/client/types';
 import { InboxData } from '@waha/apps/chatwoot/consumers/types';
@@ -13,9 +13,9 @@ import { ChatWootQueueService } from '@waha/apps/chatwoot/services/ChatWootQueue
 import { SessionManager } from '@waha/core/abc/manager.abc';
 import { AppRepository } from '@waha/apps/app_sdk/storage/AppRepository';
 import { CommandPrefix } from '@waha/apps/chatwoot/cli';
+import { IsExternalEcho } from '@waha/apps/chatwoot/api/webhook.guards';
 
 @Controller('webhooks/chatwoot/')
-@ApiTags('🧩 Apps')
 export class ChatwootWebhookController {
   constructor(
     private readonly chatWootQueueService: ChatWootQueueService,
@@ -42,8 +42,13 @@ export class ChatwootWebhookController {
     }
 
     const isCommandsChat = IsCommandsChat(body);
-    // Ignore private notes (most of them)
     const deleted = body?.content_attributes?.deleted;
+    // Ignore messages that came from WhatsApp, do not send them back
+    if (IsExternalEcho(body) && !deleted) {
+      return { success: true };
+    }
+
+    // Ignore private notes (most of them)
     if (body.private) {
       // Ignore any private note in commands chats
       if (isCommandsChat) {

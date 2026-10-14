@@ -1,6 +1,6 @@
 import { Controller, Get } from '@nestjs/common';
-import * as lodash from 'lodash';
-import { ApiOperation, ApiSecurity, ApiTags } from '@nestjs/swagger';
+import { sortBy } from 'lodash';
+import { ApiOperation, ApiSecurity } from '@nestjs/swagger';
 import { i18n } from '@waha/apps/chatwoot/i18n';
 
 interface LanguageResponse {
@@ -10,7 +10,6 @@ interface LanguageResponse {
 
 @Controller('api/apps/chatwoot')
 @ApiSecurity('api_key')
-@ApiTags('🧩 Apps')
 export class ChatwootLocalesController {
   @Get('locales')
   @ApiOperation({
@@ -20,7 +19,7 @@ export class ChatwootLocalesController {
   getLanguages(): LanguageResponse[] {
     const locales = i18n.available();
     const priority = ['en-US', 'pt-BR', 'es-ES'];
-    return lodash.sortBy(locales, [
+    return sortBy(locales, [
       (x) => {
         const idx = priority.indexOf(x.locale);
         return idx === -1 ? Number.MAX_SAFE_INTEGER : idx;

@@ -26,6 +26,43 @@ export enum AvatarUpdateMode {
   ALWAYS,
 }
 
+export enum NameUpdateMode {
+  // skip name updates, only new contacts get a name (phone book, push name or phone number)
+  NO = 'no',
+  // keep names set by hand, replace raw ones (phone number, push name) from the phone book
+  IF_RAW = 'if-raw',
+  // the phone book is the source of truth, overwrite any name
+  ALWAYS = 'always',
+}
+
+/**
+ * Raw name - empty or one of the ids the contact was created with, nobody typed it by hand
+ */
+export function IsRawName(
+  name: string,
+  placeholders: Array<string | null | undefined>,
+): boolean {
+  const current = normalizeName(name);
+  if (!current) {
+    return true;
+  }
+  for (const placeholder of placeholders) {
+    if (!placeholder) {
+      continue;
+    }
+    const value = normalizeName(placeholder);
+    const bare = value.replace(/@.*$/, '').replace(/^\+/, '');
+    if (current === value || current === bare || current === `+${bare}`) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function normalizeName(name: string): string {
+  return name.trim().toLowerCase();
+}
+
 export function sanitizeName(name: string) {
   // 255 chars max
   const limit = 255;
@@ -40,6 +77,18 @@ export function sanitizeName(name: string) {
   return clean.slice(0, 255).trim();
 }
 
+function SearchClauseEqualTo(key: string, values: string[]) {
+  // equal_to with multiple values acts as IN
+  return {
+    attribute_key: key,
+    filter_operator: 'equal_to',
+    values: values,
+    attribute_model: 'standard',
+    custom_attribute_type: '',
+    query_operator: 'OR',
+  };
+}
+
 export class ContactService {
   constructor(
     private config: ChatWootAPIConfig,
@@ -52,8 +101,11 @@ export class ContactService {
     contactInfo: ContactInfo,
   ): Promise<[ContactResponse, boolean]> {
     const chatId = contactInfo.ChatId();
-    let contact = await this.searchByAnyID(chatId);
+    const lid = await contactInfo.LidId();
+    const jid = await contactInfo.JidId();
+    let contact = await this.search(chatId, lid, jid);
     if (contact) {
+      await this.upsertPhoneNumber(contact, contactInfo);
       return [contact, false];
     }
 
@@ -62,52 +114,35 @@ export class ContactService {
     return [contact, true];
   }
 
-  async searchByAnyID(chatId: string): Promise<ContactResponse | null> {
-    const payload: any[] = [
-      {
-        attribute_key: AttributeKey.WA_CHAT_ID,
-        filter_operator: 'equal_to',
-        values: [chatId],
-        attribute_model: 'standard',
-        custom_attribute_type: '',
-        query_operator: 'OR',
-      },
-      {
-        attribute_key: AttributeKey.WA_JID,
-        filter_operator: 'equal_to',
-        values: [chatId],
-        attribute_model: 'standard',
-        custom_attribute_type: '',
-        query_operator: 'OR',
-      },
-      {
-        attribute_key: AttributeKey.WA_LID,
-        filter_operator: 'equal_to',
-        values: [chatId],
-        attribute_model: 'standard',
-        custom_attribute_type: '',
-        query_operator: 'OR',
-      },
-      {
-        attribute_key: 'identifier',
-        filter_operator: 'equal_to',
-        values: [chatId],
-        attribute_model: 'standard',
-        custom_attribute_type: '',
-      },
-    ];
-
-    if (isJidCusFormat(chatId)) {
-      // Search by phone
-      const phoneNumberE164 = E164Parser.fromJid(chatId);
-      const phone_number = phoneNumberE164.replace('+', '');
-      payload[payload.length - 1].query_operator = 'OR';
-      payload.push({
-        attribute_key: 'phone_number',
-        filter_operator: 'equal_to',
-        values: [phone_number],
-      });
+  async search(
+    chatId: string,
+    lid: string | null,
+    jid: string | null,
+  ): Promise<ContactResponse | null> {
+    // The chat id attribute holds the latest used address, so match any known form there
+    const chatIds = lodash.uniq(lodash.compact([chatId, jid, lid]));
+    if (chatIds.length == 0) {
+      return null;
     }
+
+    const payload: any[] = [
+      SearchClauseEqualTo(AttributeKey.WA_CHAT_ID, chatIds),
+      SearchClauseEqualTo('identifier', chatIds),
+    ];
+    if (jid) {
+      payload.push(SearchClauseEqualTo(AttributeKey.WA_JID, [jid]));
+    }
+    if (lid) {
+      payload.push(SearchClauseEqualTo(AttributeKey.WA_LID, [lid]));
+    }
+    if (jid && isJidCusFormat(jid)) {
+      // Search by phone - both with and without the leading '+'
+      const phoneNumberE164 = E164Parser.fromJid(jid);
+      let phones = [phoneNumberE164, phoneNumberE164.replace('+', '')];
+      payload.push(SearchClauseEqualTo('phone_number', phones));
+    }
+    // The terminal clause must have no query_operator
+    delete payload[payload.length - 1].query_operator;
 
     const response: any = await this.accountAPI.contacts.filter({
       accountId: this.config.accountId,
@@ -115,20 +150,58 @@ export class ContactService {
     });
 
     const contacts = response.payload;
-    if (contacts.length == 0) {
+    const candidates: ContactResponse[] = [];
+    for (const contact of contacts) {
+      const inboxes = lodash.filter(contact.contact_inboxes, {
+        inbox: { id: this.config.inboxId },
+      });
+      if (inboxes.length == 0) {
+        continue;
+      }
+      candidates.push({
+        data: contact,
+        sourceId: inboxes[0].source_id,
+      });
+    }
+    if (candidates.length == 0) {
       return null;
     }
-    const contact = contacts[0];
-    const inboxes = lodash.filter(contact.contact_inboxes, {
-      inbox: { id: this.config.inboxId },
-    });
-    if (inboxes.length == 0) {
-      return null;
+    // Prefer a contact with a phone number over a phone-less duplicate
+    const withPhone = candidates.find((candidate) =>
+      Boolean(candidate.data.phone_number),
+    );
+    return withPhone ?? candidates[0];
+  }
+
+  private async upsertPhoneNumber(
+    contact: ContactResponse,
+    contactInfo: ContactInfo,
+  ): Promise<void> {
+    if (contact.data.phone_number) {
+      return;
     }
-    return {
-      data: contact,
-      sourceId: inboxes[0].source_id,
-    };
+    const phoneNumberE164 = await contactInfo.PhoneNumberE164();
+    if (!phoneNumberE164) {
+      return;
+    }
+    try {
+      await this.accountAPI.contacts.update({
+        id: contact.data.id,
+        accountId: this.config.accountId,
+        data: { phone_number: phoneNumberE164 },
+      });
+      contact.data.phone_number = phoneNumberE164;
+      this.logger.info(
+        `Set phone_number for contact.id: ${
+          contact.data.id
+        }, chat.id: ${contactInfo.ChatId()}`,
+      );
+    } catch (err) {
+      // Chatwoot returns 422 when another contact already owns the phone number
+      this.logger.warn(
+        `Error updating phone_number for contact.id: ${contact.data.id} - ${err}`,
+      );
+    }
   }
 
   public async upsertCustomAttributes(
@@ -146,6 +219,37 @@ export class ContactService {
       accountId: this.config.accountId,
       data: update,
     });
+    return true;
+  }
+
+  /**
+   * Set the contact name, returns true when it changed
+   */
+  public async updateName(
+    contact: ContactResponse,
+    name: string,
+  ): Promise<boolean> {
+    name = sanitizeName(name);
+    const current = contact.data.name ?? '';
+    if (!name || current.trim() === name.trim()) {
+      return false;
+    }
+    try {
+      await this.accountAPI.contacts.update({
+        id: contact.data.id,
+        accountId: this.config.accountId,
+        data: { name: name },
+      });
+    } catch (err) {
+      this.logger.warn(
+        `Error updating name for contact.id: ${contact.data.id} - ${err}`,
+      );
+      return false;
+    }
+    this.logger.info(
+      `Renamed contact.id: ${contact.data.id}: '${current}' => '${name}'`,
+    );
+    contact.data.name = name;
     return true;
   }
 
