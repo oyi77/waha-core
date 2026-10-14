@@ -590,7 +590,7 @@ export class WhatsappSessionWPPCore extends WhatsappSession {
     if (!this.wpp?.page) {
       throw new ServiceUnavailableException('WPP page is not ready');
     }
-    const normalizedChatId = this.ensureSuffix(chatId);
+    const normalizedChatId = ensureSuffix(chatId);
     const callModel = await this.wpp.page.evaluate(
       async (to: string, video: boolean) => {
         return await WPP.call.offer(to, { isVideo: video });

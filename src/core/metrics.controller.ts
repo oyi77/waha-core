@@ -11,7 +11,7 @@ import { Request } from 'express';
 import { safeEqual } from '@waha/core/auth/dashboardCookieAuth';
 import { Auth } from '@waha/core/auth/config';
 import { SessionManager } from '@waha/core/abc/manager.abc';
-import { WebhookSender } from '@waha/core/integrations/webhooks/WebhookSender';
+import { WebhookSender } from '@waha/modules/waha-webhook/WebhookPlugin.sender';
 
 /**
  * Prometheus exposition endpoint — GET /metrics.

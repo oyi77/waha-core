@@ -92,7 +92,7 @@ import { MetricsController } from './metrics.controller';
 import { WAHAHealthCheckService } from './abc/WAHAHealthCheckService';
 import { ApiKeyAuthFactory } from './auth/ApiKeyAuthFactory';
 import { LoginRateLimitMiddleware } from './auth/login-rate-limit.middleware';
-import { DashboardConfigServiceCore } from './config/DashboardConfigServiceCore';
+import { DashboardConfigService } from '@waha/modules/waha-dashboard/dashboard.config';
 import { EngineConfigService } from './config/EngineConfigService';
 import { WAHAHealthCheckServiceCore } from './health/WAHAHealthCheckServiceCore';
 import { SessionManagerCore } from './manager.core';
@@ -278,7 +278,7 @@ export class AppModuleCore {
 
   constructor(
     protected config: WhatsappConfigService,
-    protected dashboardConfig: DashboardConfigServiceCore,
+    protected dashboardConfig: DashboardConfigService,
     private httpPaths: HttpPathsService,
   ) {
     this.startTimestamp = Date.now();

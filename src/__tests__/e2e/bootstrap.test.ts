@@ -17,10 +17,10 @@ import { ApiKeyStrategy } from '@waha/core/auth/apiKey.strategy';
 import { IApiKeyAuth } from '@waha/core/auth/auth';
 import { CaslAbilityFactory } from '@waha/core/auth/casl.ability';
 import { PoliciesGuard } from '@waha/core/auth/policies.guard';
-import { DashboardConfigServiceCore } from '@waha/core/config/DashboardConfigServiceCore';
+import { DashboardConfigService } from '@waha/modules/waha-dashboard/dashboard.config';
 import { EngineConfigService } from '@waha/core/config/EngineConfigService';
 import { GowsEngineConfigService } from '@waha/core/config/GowsEngineConfigService';
-import { SwaggerConfigServiceCore } from '@waha/core/config/SwaggerConfigServiceCore';
+import { SwaggerConfigService } from '@waha/modules/waha-swagger/swagger.config';
 import { WebJSEngineConfigService } from '@waha/core/config/WebJSEngineConfigService';
 import { WPPEngineConfigService } from '@waha/core/config/WPPEngineConfigService';
 import { Logger as NestJSPinoLogger, LoggerModule } from 'nestjs-pino';
@@ -78,8 +78,8 @@ const MOCK_HEALTH_SERVICE = {
     WebJSEngineConfigService,
     WPPEngineConfigService,
     GowsEngineConfigService,
-    DashboardConfigServiceCore,
-    SwaggerConfigServiceCore,
+    DashboardConfigService,
+    SwaggerConfigService,
     ApiKeyStrategy,
     ApiKeyService,
     CaslAbilityFactory,

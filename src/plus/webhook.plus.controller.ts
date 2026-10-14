@@ -26,8 +26,8 @@ import { WAHAEvents } from '../structures/enums.dto';
 import * as crypto from 'crypto';
 
 import { ConfigService } from '@nestjs/config';
-import { GlobalWebhookConfigConfig } from '../core/config/GlobalWebhookConfig';
-import { webhookHmacHeaders, WebhookSender } from '../core/integrations/webhooks/WebhookSender';
+import { GlobalWebhookConfig } from '@waha/modules/waha-webhook/webhook.config';
+import { webhookHmacHeaders, WebhookSender } from '@waha/modules/waha-webhook/WebhookPlugin.sender';
 
 class WebhookTestRequest {
   @ApiProperty({ description: 'Webhook URL to test' })
@@ -113,7 +113,7 @@ export class WebhookPlusController {
     };
     const body = JSON.stringify(payload);
     // Sign exactly like real deliveries so HMAC-enforcing endpoints answer 200.
-    const globalKey = new GlobalWebhookConfigConfig(this.configService).hmacKey;
+    const globalKey = new GlobalWebhookConfig(this.configService).config?.hmac?.key;
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       'X-Webhook-Request-Id': crypto.randomUUID().replace(/-/g, ''),

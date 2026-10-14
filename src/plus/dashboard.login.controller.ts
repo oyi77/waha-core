@@ -9,7 +9,7 @@ import {
   Res,
 } from '@nestjs/common';
 import { ApiOperation, ApiProperty, ApiTags } from '@nestjs/swagger';
-import { DashboardConfigServiceCore } from '@waha/core/config/DashboardConfigServiceCore';
+import { DashboardConfigService } from '@waha/modules/waha-dashboard/dashboard.config';
 import {
   isSecureRequest,
   makeAuthToken,
@@ -46,7 +46,7 @@ export class DashboardLoginController {
   private readonly logger = new Logger(DashboardLoginController.name);
 
   constructor(
-    private dashboardConfig: DashboardConfigServiceCore,
+    private dashboardConfig: DashboardConfigService,
     @Optional() private settingsService?: SettingsService,
   ) {}
 

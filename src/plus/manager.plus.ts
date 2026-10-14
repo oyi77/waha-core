@@ -16,7 +16,6 @@ import { GowsEngineConfigService } from '@waha/core/config/GowsEngineConfigServi
 import { WPPEngineConfigService } from '@waha/core/config/WPPEngineConfigService';
 import { WebJSEngineConfigService } from '@waha/core/config/WebJSEngineConfigService';
 import { WhatsappSessionGoWSCore } from '@waha/core/engines/gows/session.gows.core';
-import { WebhookConductor } from '@waha/core/integrations/webhooks/WebhookConductor';
 import { MediaStorageFactory } from '@waha/core/media/MediaStorageFactory';
 import { Sqlite3ApiKeyRepository } from '@waha/core/storage/sqlite3/Sqlite3ApiKeyRepository';
 import { LocalSessionAuthRepository } from '@waha/core/storage/LocalSessionAuthRepository';
@@ -28,6 +27,7 @@ import { getPinoLogLevel, LoggerBuilder } from '@waha/utils/logging';
 import { promiseTimeout, sleep } from '@waha/utils/promiseTimeout';
 import { complete } from '@waha/utils/reactive/complete';
 import { SwitchObservable } from '@waha/utils/reactive/SwitchObservable';
+import { SessionPluginsService } from '@waha/plugins/SessionPluginsService';
 import { PinoLogger } from 'nestjs-pino';
 import { Observable, retry, share } from 'rxjs';
 import { map } from 'rxjs/operators';
@@ -100,8 +100,8 @@ export class SessionManagerPlus extends SessionManager implements OnModuleInit, 
     private nowebEngineConfigService: NowebEngineConfigService,
     log: PinoLogger,
     private mediaStorageFactory: MediaStorageFactory,
-    @Inject(AppsService)
-    appsService: IAppsService,
+    @Inject(AppsService) appsService: IAppsService,
+    private sessionPlugins: SessionPluginsService,
     @Optional() private messageEventService?: MessageEventService,
     @Optional() private autoReplyService?: AutoReplyService,
     @Optional() private messageLogService?: MessageLogService,
@@ -317,12 +317,11 @@ export class SessionManagerPlus extends SessionManager implements OnModuleInit, 
     );
     await storage.init();
     const mediaManager = new MediaManager(
+      name,
       storage,
-      this.config.mimetypes,
       loggerBuilder.child({ name: 'MediaManager' }),
     );
 
-    const webhook = new WebhookConductor(loggerBuilder);
     const proxyConfig = this.resolveProxy(name, config);
     const sessionConfig: SessionParams = {
       name,
@@ -333,6 +332,7 @@ export class SessionManagerPlus extends SessionManager implements OnModuleInit, 
       proxyConfig,
       sessionConfig: config,
       ignore: this.ignoreChatsConfig(config),
+      media: this.config.mediaConfig,
     };
 
     // Per-session engine override: use config.engine if specified, else fallback to server default
@@ -360,9 +360,10 @@ export class SessionManagerPlus extends SessionManager implements OnModuleInit, 
     this.sessions.set(name, session);
     this.updateSessionEvents(name);
 
-    // Configure webhooks
-    const webhooks = this.resolveWebhooks(config);
-    webhook.configure(session, webhooks);
+    // Plugins (webhooks module contributes WebhookPlugin via SessionPluginsService)
+    for (const options of this.sessionPlugins.plugins(session)) {
+      session.plugins.add(options);
+    }
 
     // Apps
     try {
@@ -371,6 +372,8 @@ export class SessionManagerPlus extends SessionManager implements OnModuleInit, 
       logger.error(`Apps Error: ${e}`);
       session.status = WAHASessionStatus.FAILED;
     }
+
+    session.plugins.attach();
 
     if (session.status !== WAHASessionStatus.FAILED) {
       await session.start();
@@ -482,7 +485,7 @@ export class SessionManagerPlus extends SessionManager implements OnModuleInit, 
           config: session.sessionConfig,
           me: session.getSessionMeInfo(),
           presence: session.presence,
-          timestamps: { activity: session.getLastActivityTimestamp() },
+          timestamps: { activity: null },
         });
       }
     }
@@ -524,7 +527,7 @@ export class SessionManagerPlus extends SessionManager implements OnModuleInit, 
       config: session.sessionConfig,
       me: session.getSessionMeInfo(),
       presence: session.presence,
-      timestamps: { activity: session.getLastActivityTimestamp() },
+      timestamps: { activity: null },
       engine,
     };
   }
@@ -553,13 +556,6 @@ export class SessionManagerPlus extends SessionManager implements OnModuleInit, 
   }
 
   // ─── Helpers ──────────────────────────────────────────────────────────────────
-  private resolveWebhooks(config?: SessionConfig | null): WebhookConfig[] {
-    let webhooks: WebhookConfig[] = [];
-    if (config?.webhooks) webhooks = webhooks.concat(config.webhooks);
-    const global = this.config.getWebhookConfig();
-    if (global) webhooks.push(global);
-    return webhooks;
-  }
 
   private resolveProxy(
     name: string,

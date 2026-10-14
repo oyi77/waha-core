@@ -11,7 +11,8 @@ import { WAHAHealthCheckServiceCore } from '@waha/core/health/WAHAHealthCheckSer
 import { MediaLocalStorageModule } from '@waha/core/media/local/media.local.storage.module';
 import { MediaS3StorageModule } from '@waha/plus/media/s3/media.s3.storage.module';
 import { MediaPgStorageModule } from '@waha/plus/media/pg/media.pg.storage.module';
-import { DashboardConfigServiceCore } from '@waha/core/config/DashboardConfigServiceCore';
+import { HttpPathsService } from '@waha/plugins/HttpPathsService';
+import { DashboardConfigService } from '@waha/modules/waha-dashboard/dashboard.config';
 import { WhatsappConfigService } from '@waha/config.service';
 import { ChannelsInfoServiceCore } from '@waha/core/services/ChannelsInfoServiceCore';
 import { SessionManager } from '@waha/core/abc/manager.abc';
@@ -141,10 +142,11 @@ const PROVIDERS = [
 export class AppModulePlus extends AppModuleCore {
   constructor(
     config: WhatsappConfigService,
-    dashboardConfig: DashboardConfigServiceCore,
+    dashboardConfig: DashboardConfigService,
+    httpPaths: HttpPathsService,
     @Optional() private settingsService?: SettingsService,
   ) {
-    super(config, dashboardConfig);
+    super(config, dashboardConfig, httpPaths);
   }
 
   protected override getCredentialResolver(): CredentialResolver {

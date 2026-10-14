@@ -7,7 +7,7 @@ import {
   Res,
 } from '@nestjs/common';
 import { ApiOperation, ApiProperty, ApiTags } from '@nestjs/swagger';
-import { DashboardConfigServiceCore } from '@waha/core/config/DashboardConfigServiceCore';
+import { DashboardConfigService } from '@waha/modules/waha-dashboard/dashboard.config';
 import {
   isSecureRequest,
   makeAuthToken,
@@ -29,7 +29,7 @@ class LoginBody {
 @Controller('api/dashboard')
 @ApiTags('🔐 Dashboard Auth')
 export class DashboardLoginController {
-  constructor(private dashboardConfig: DashboardConfigServiceCore) {}
+  constructor(private dashboardConfig: DashboardConfigService) {}
 
   @Post('login')
   @ApiOperation({

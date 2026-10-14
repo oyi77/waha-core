@@ -9,7 +9,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { ApiOperation, ApiProperty, ApiTags } from '@nestjs/swagger';
-import { DashboardConfigServiceCore } from '@waha/core/config/DashboardConfigServiceCore';
+import { DashboardConfigService } from '@waha/modules/waha-dashboard/dashboard.config';
 import {
   isSecureRequest,
   makeAuthToken,
@@ -37,7 +37,7 @@ class UpdateCredentialsBody {
 export class SettingsController {
   constructor(
     private settingsService: SettingsService,
-    private dashboardConfig: DashboardConfigServiceCore,
+    private dashboardConfig: DashboardConfigService,
   ) {}
 
   private async verifyAuth(req: Request): Promise<void> {
