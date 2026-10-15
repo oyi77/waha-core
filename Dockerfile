@@ -223,27 +223,32 @@ RUN apt-get update && apt-get install -y tini && rm -rf /var/lib/apt/lists/*
 # Set the ENV for docker image
 ENV WHATSAPP_DEFAULT_ENGINE=$WHATSAPP_DEFAULT_ENGINE
 
-# Attach sources, install packages
+# Create waha user and app structure
+RUN groupadd -r waha && useradd -r -g waha -d /app -s /usr/sbin/nologin waha \
+    && mkdir -p /app/data /app/logs /app/.sessions /app/.media /app/.backups \
+    && chown -R waha:waha /app
+
 WORKDIR /app
-COPY package.json ./
-COPY --from=build /git/node_modules ./node_modules
-COPY --from=build /git/dist ./dist
+COPY --chown=waha:waha package.json ./
+COPY --chown=waha:waha --from=build /git/node_modules ./node_modules
+COPY --chown=waha:waha --from=build /git/dist ./dist
 # Copy built dashboard from dashboard stage
-COPY --from=dashboard /dashboard/.output/public/ ./dist/dashboard/
+COPY --chown=waha:waha --from=dashboard /dashboard/.output/public/ ./dist/dashboard/
 # Apply custom dashboard overlays
-COPY src/dashboard/login.html ./dist/dashboard/
-COPY src/dashboard/plus-nav.js ./dist/dashboard/
-COPY src/dashboard/ws-reconnect-fix.js ./dist/dashboard/
-COPY --from=gows /go/gows/bin/gows /app/gows
-COPY .env.example ./.env.example
-COPY scripts/init-waha.js ./scripts/init-waha.js
+COPY --chown=waha:waha src/dashboard/login.html ./dist/dashboard/
+COPY --chown=waha:waha src/dashboard/plus-nav.js ./dist/dashboard/
+COPY --chown=waha:waha src/dashboard/ws-reconnect-fix.js ./dist/dashboard/
+COPY --chown=waha:waha --from=gows /go/gows/bin/gows /app/gows
+COPY --chown=waha:waha .env.example ./.env.example
+COPY --chown=waha:waha scripts/init-waha.js ./scripts/init-waha.js
 RUN chmod +x ./scripts/init-waha.js \
   && printf '%s\n' '#!/bin/sh' 'exec node /app/scripts/init-waha.js "$@"' > /usr/local/bin/init-waha \
   && chmod +x /usr/local/bin/init-waha
 ENV WAHA_GOWS_PATH=/app/gows
 ENV WAHA_GOWS_SOCKET=/tmp/gows.sock
 
-COPY entrypoint.sh /entrypoint.sh
+COPY --chown=waha:waha entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
 # Chokidar options to monitor file changes
 ENV CHOKIDAR_USEPOLLING=1
@@ -254,10 +259,6 @@ ENV WAHA_ZIPPER=ZIPUNZIP
 
 # GOWS - use libc DNS resolver
 ENV GODEBUG=netdns=cgo
-RUN groupadd -r waha && useradd -r -g waha -d /app -s /usr/sbin/nologin waha \
-    && mkdir -p /app/data /app/logs \
-    && chown -R waha:waha /app
-
 USER waha
 
 EXPOSE 3000
