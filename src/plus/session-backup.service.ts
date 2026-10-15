@@ -3,6 +3,7 @@ import { PinoLogger } from 'nestjs-pino';
 import { SessionManager } from '@waha/core/abc/manager.abc';
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import * as crypto from 'crypto';
 
 interface BackupMetadata {
   session: string;
@@ -152,7 +153,33 @@ export class SessionBackupService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async calculateChecksum(dir: string): Promise<string> {
-    return 'placeholder-checksum';
+    const hash = crypto.createHash('sha256');
+    const collectFiles = async (currentDir: string): Promise<string[]> => {
+      const fileList: string[] = [];
+      const entries = await fs.readdir(currentDir, { withFileTypes: true });
+      for (const entry of entries) {
+        const fullPath = path.join(currentDir, entry.name);
+        if (entry.isDirectory()) {
+          fileList.push(...(await collectFiles(fullPath)));
+        } else if (entry.isFile()) {
+          fileList.push(fullPath);
+        }
+      }
+      return fileList.sort();
+    };
+
+    try {
+      const files = await collectFiles(dir);
+      for (const file of files) {
+        const relPath = path.relative(dir, file);
+        hash.update(relPath);
+        const content = await fs.readFile(file);
+        hash.update(content);
+      }
+      return hash.digest('hex');
+    } catch {
+      return 'unknown';
+    }
   }
 
   private async cleanupOldBackups() {
